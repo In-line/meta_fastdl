@@ -1,0 +1,33 @@
+[package]
+name = "meta_fastdl-rust"
+version = "0.1.0"
+authors = ["Alik Aslanyan <cplusplus256@gmail.com>"]
+edition = "2018"
+build = "src/build.rs"
+
+[lib]
+crate-type = ["staticlib"]
+
+[profile.release]
+lto = "fat"
+panic = "abort"
+codegen-units = 1
+opt-level = 3
+
+[dependencies]
+hyper = "0.12.27"
+http = "0.1.17"
+tokio = "0.1.18"
+futures = "0.1.26"
+clone_all = "0.1.1"
+hyper-staticfile = "0.3.1"
+filepath = "0.1.1"
+chashmap = "2.2.2"
+libc = "0.2.58"
+trust-dns-resolver = "0.11.1"
+ref_thread_local = "0.0.0"
+radix_trie = "0.1.4"
+serde-hjson = "0.9.0"
+
+[build-dependencies]
+cbindgen = "0.8.7"
