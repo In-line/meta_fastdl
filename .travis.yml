@@ -1,0 +1,129 @@
+dist: xenial
+language: rust
+compiler:
+- clang
+rust:
+- 1.34.0
+- nightly
+env:
+  global:
+    - PKG_CONFIG_ALLOW_CROSS=1 TARGET=i686-unknown-linux-gnu CXX=/usr/bin/clang++-8 CC=/usr/bin/clang-8
+  matrix:
+    - RUN_DEBUG_TEST=1 RUN_DEBUG_BUILD=1
+    - RUN_RELEASE_TEST=1 RUN_CLIPPY=1
+    - RUN_RELEASE_BUILD=1
+os:
+- linux
+matrix:
+  allow_failures:
+  - rust: nightly
+  fast_finish: true
+  exclude:
+    - env: RUN_RELEASE_TEST=1 RUN_CLIPPY=1
+      rust: beta
+    - env: RUN_RELEASE_TEST=1 RUN_CLIPPY=1
+      rust: nightly
+    - env: RUN_RELEASE_BUILD=1
+      rust: beta
+    - env: RUN_RELEASE_BUILD=1
+      rust: nightly
+addons:
+  apt:
+    packages:
+    - libssl-dev:i386
+    - lib32stdc++6
+    - lib32z1-dev
+    - libc6-dev-i386
+    - linux-libc-dev
+    - gcc-multilib
+    - g++-multilib
+    - ninja-build
+    - clang-8
+    - lld-8
+    sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-xenial-8
+install:
+- rustup target add $TARGET
+- cargo install cargo-sweep || true
+- if [ "$TRAVIS_RUST_VERSION" = stable ]; then (rustup component add clippy || true) fi
+before_script:
+- $CXX --version
+- mkdir -p $TRAVIS_BUILD_DIR/build/release/rust
+- mkdir -p $TRAVIS_BUILD_DIR/build/debug/rust
+- cmake  --version
+script:
+  - |
+      cd $TRAVIS_BUILD_DIR/rust
+      if [ "$TRAVIS_RUST_VERSION" = stable ] && [ -n "$RUN_CLIPPY" ]; then
+        (CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/build/debug/rust cargo clippy --target $TARGET --all -- -D clippy::all)
+      fi
+
+  - |
+      if [ -n "$RUN_DEBUG_TEST" ]; then
+        CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/build/release/rust cargo test --verbose --target $TARGET
+      fi
+
+  - |
+      if [ -n "$RUN_RELEASE_TEST" ]; then
+        CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/build/debug/rust cargo test --verbose --release --target $TARGET
+      fi
+
+  - |
+      if [ -n "$RUN_DEBUG_BUILD" ]; then
+        cd $TRAVIS_BUILD_DIR/build/debug
+        cmake $TRAVIS_BUILD_DIR -DCMAKE_BUILD_TYPE=Debug
+        make -j1
+        sh $TRAVIS_BUILD_DIR/scripts/check_static_linking.sh .
+      fi
+
+  - |
+      if [ -n "$RUN_RELEASE_BUILD" ]; then
+        cd $TRAVIS_BUILD_DIR/build/release
+        cmake $TRAVIS_BUILD_DIR -DCMAKE_BUILD_TYPE=Release
+        make -j1
+        sh $TRAVIS_BUILD_DIR/scripts/check_static_linking.sh .
+      fi
+
+  - |
+      if [ "$TRAVIS_RUST_VERSION" = stable ] && [ -n "$RUN_RELEASE_BUILD" ]; then
+          DO_DEPLOY=1
+      fi
+
+
+before_deploy:
+- mkdir -p $TRAVIS_BUILD_DIR/deploy/addons/meta_fastdl/
+- cp $TRAVIS_BUILD_DIR/build/release/*.so $TRAVIS_BUILD_DIR/deploy/addons/meta_fastdl
+- cp $TRAVIS_BUILD_DIR/configs/* $TRAVIS_BUILD_DIR/deploy/addons/meta_fastdl
+- cd $TRAVIS_BUILD_DIR/deploy
+- tar czf grip-${TRAVIS_TAG}-${TARGET}.tar.gz addons
+deploy:
+  provider: releases
+  api_key:
+    secure: hXHKlqD/wHvciCpcO115u/PQxGaiFhCfEaJrxbG198KPl4IxZu2b79fXFrj4f1Qj5b5H4RVgJHATx18FMGj/A6UXgbWN+JIFxJSnkpFV3ziHJSTvQssXxp+KKJiMMgNG+G259oPwzjRx8y/TJVYGt+H9pbYunbtsMEaj+giOUuhMIv/y0DuDaCi53zwRtIds8vJzMB2f3KRq1Wq99L6xUyrIUIuTrNckyrBJxirRE7YujQhCl4RJAchRopgvTHFPFRIIPnZb+uSMxpTtfIY9Y8dR30n8EY9ZiNlLlo81z/ZFlbAJjqNsOXJXZSNwv0Bp2WT34UaXX0T+8U8Y4nHu8aEnItbTrlhpurgBQDAzDiVaemFBj6TZ00l5oiTp21bHJg8EwMQR13muYcuMkiymem0N5gYQqT6fB5+TqOhgKk6M/pKKCP9Y0HKCoAA/Kl7M+wY5VdwQEOzv0McVAdVvwPFp1CJp6+7l8O3G5fP68txeyZIfcYrp5TLZRutbBnHMwfvddf8S6fSv+3p7RcxJBwKJ2sc6lD9qJA09nGUv/EpSHC5lFwZ3u3dxhqPnR09ae/QyAh0BaeMLTeV4ks5RisFYTUo3X7doGE49KeEM581KjrRF6ZnVc7A/0/Rc3EzqFBT1/OJz8CM3oLj1knUKC5qqZaLTJBNh9hhaPINtjno=
+  file: meta_fastdl-${TRAVIS_TAG}-${TARGET}.tar.gz
+  skip_cleanup: true
+  on:
+    repo: In-line/meta_fastdl
+# NOTE make sure you only release *once* per target
+    condition: $DO_DEPLOY = 1
+    tags: true
+cache:
+  cargo: true
+  directories:
+  - "$TRAVIS_BUILD_DIR/build/release/rust"
+  - "$TRAVIS_BUILD_DIR/build/debug/rust"
+
+before_cache:
+- chmod -R a+r $HOME/.cargo
+- chmod -R a+r $TRAVIS_BUILD_DIR/build/release/rust
+- chmod -R a+r $TRAVIS_BUILD_DIR/build/debug/rust
+- cd $TRAVIS_BUILD_DIR/rust
+- CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/build/release/rust cargo sweep --maxsize 1500
+- CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/build/debug/rust cargo sweep --maxsize 1500
+- CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/build/release/rust cargo sweep -t 30
+- CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/build/debug/rust cargo sweep -t 30
+- cd -
+
+notifications:
+  email: false
