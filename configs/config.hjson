@@ -1,5 +1,12 @@
 {
+	# Bind URL will be automatically written to `sv_downloadurl`. 
+	# Host IP from URL will be automatically bound and used to serve files
+	# If domain name is used instead than module will attempt to resolve IP.
 	bind_url: http://127.0.0.1:8081
+  
+	# Module will automatically serve precached files, but user precached files can't be hooked.
+	# So instead, files from some folders should be allowed.
+	# Bellow is prefix whitelist. It's not necessary list of folders, anything will match. 
 	prefix_whitelist: [
 		models/
 		sound/
