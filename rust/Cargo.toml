@@ -17,7 +17,7 @@ opt-level = 3
 [dependencies]
 hyper = "0.12.31"
 http = "0.1.17"
-tokio = "0.1.22"
+tokio = "0.2.5"
 futures = "0.1.28"
 clone_all = "0.1.1"
 hyper-staticfile = "0.3.1"
