@@ -15,7 +15,7 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-hyper = "0.12.31"
+hyper = "0.14.11"
 http = "0.1.17"
 tokio = "0.1.22"
 futures = "0.1.28"
